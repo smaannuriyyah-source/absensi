@@ -3,32 +3,65 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { execSync } from "child_process";
+
+async function pushSchema() {
+  try {
+    execSync("npx prisma db push --skip-generate", {
+      timeout: 60000,
+      stdio: "pipe",
+    });
+    return true;
+  } catch (error) {
+    console.error("Prisma db push failed:", error);
+    return false;
+  }
+}
 
 export async function GET(req: NextRequest) {
   try {
-    // Secret key check - only allow if secret matches or no admin exists yet
     const secret = req.nextUrl.searchParams.get("secret");
     const adminUsername = process.env.ADMIN_USERNAME || "admin";
     const validSecret = process.env.SEED_SECRET || process.env.SESSION_SECRET;
 
+    // Step 1: Push schema first
+    console.log("📦 Pushing database schema...");
+    const schemaPushed = await pushSchema();
+
+    if (!schemaPushed) {
+      return NextResponse.json(
+        { error: "Failed to push database schema" },
+        { status: 500 }
+      );
+    }
+
+    // Step 2: Check if admin exists
     const existingAdmin = await prisma.admin.findFirst({
       where: { username: adminUsername },
     });
 
-    // If admin already exists, require secret key
+    // If admin exists and no valid secret, skip
     if (existingAdmin && secret !== validSecret) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({
+        message: "Database already seeded",
+        seeded: false,
+        schemaPushed: true,
+      });
     }
 
-    // If admin exists and secret matches, skip seeding
     if (existingAdmin) {
-      return NextResponse.json({ message: "Database already seeded", seeded: false });
+      return NextResponse.json({
+        message: "Database already seeded",
+        seeded: false,
+        schemaPushed: true,
+      });
     }
 
+    // Step 3: Seed data
     console.log("🌱 Seeding database...");
-
     const adminPassword = process.env.ADMIN_PASSWORD || "admin123";
     const adminHash = await bcrypt.hash(adminPassword, 10);
+
     await prisma.admin.create({
       data: { username: adminUsername, passwordHash: adminHash },
     });
@@ -59,6 +92,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       message: "Database seeded successfully",
       seeded: true,
+      schemaPushed: true,
       admin: { username: adminUsername, password: adminPassword },
     });
   } catch (error) {
