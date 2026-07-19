@@ -6,7 +6,12 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Public routes - no auth needed
-  if (pathname === "/login" || pathname === "/" || pathname === "/api/auth/login") {
+  if (
+    pathname === "/login" ||
+    pathname === "/" ||
+    pathname === "/api/auth/login" ||
+    pathname === "/api/seed"
+  ) {
     const response = NextResponse.next();
     try {
       const session = await getIronSession<SessionData>(request, response, sessionOptions);

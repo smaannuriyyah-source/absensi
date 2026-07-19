@@ -1,16 +1,26 @@
-import { NextResponse } from "next/server";
+export const dynamic = "force-dynamic";
+
+import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 
-export const dynamic = "force-dynamic";
-
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    // Secret key check - only allow if secret matches or no admin exists yet
+    const secret = req.nextUrl.searchParams.get("secret");
     const adminUsername = process.env.ADMIN_USERNAME || "admin";
+    const validSecret = process.env.SEED_SECRET || process.env.SESSION_SECRET;
+
     const existingAdmin = await prisma.admin.findFirst({
       where: { username: adminUsername },
     });
 
+    // If admin already exists, require secret key
+    if (existingAdmin && secret !== validSecret) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // If admin exists and secret matches, skip seeding
     if (existingAdmin) {
       return NextResponse.json({ message: "Database already seeded", seeded: false });
     }
@@ -46,7 +56,11 @@ export async function GET() {
     }
 
     console.log("✅ Seed completed");
-    return NextResponse.json({ message: "Database seeded successfully", seeded: true });
+    return NextResponse.json({
+      message: "Database seeded successfully",
+      seeded: true,
+      admin: { username: adminUsername, password: adminPassword },
+    });
   } catch (error) {
     console.error("❌ Seed error:", error);
     return NextResponse.json({ error: "Seed failed" }, { status: 500 });
