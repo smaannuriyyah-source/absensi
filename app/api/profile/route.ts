@@ -13,7 +13,11 @@ export async function GET() {
     if (!teacher) return NextResponse.json({ error: "Guru tidak ditemukan" }, { status: 404 });
     const subjectList = await getTeacherSubjects(session.id);
     const { passwordHash, ...teacherData } = teacher;
-    return NextResponse.json({ ...teacherData, subjects: subjectList });
+    const profileComplete = subjectList.length > 0;
+    if (teacherData.profileComplete !== profileComplete) {
+      await db.update(teachers).set({ profileComplete }).where(eq(teachers.id, session.id));
+    }
+    return NextResponse.json({ ...teacherData, profileComplete, subjects: subjectList });
   } catch (error: any) {
     if (error.message === "Unauthorized") return NextResponse.json({ error: error.message }, { status: 401 });
     console.error("GET profile error:", error);

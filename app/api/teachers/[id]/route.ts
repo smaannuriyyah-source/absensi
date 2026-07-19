@@ -38,6 +38,9 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
         await db.insert(teacherSubjects).values(
           subjectIds.map((subjectId: number) => ({ teacherId: id, subjectId }))
         );
+        await db.update(teachers).set({ profileComplete: true }).where(eq(teachers.id, id));
+      } else {
+        await db.update(teachers).set({ profileComplete: false }).where(eq(teachers.id, id));
       }
     }
 

@@ -9,8 +9,9 @@ import { eq } from "drizzle-orm";
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     await requireAdmin();
-    const { name, classId } = await req.json();
+    const { nisn, name, classId } = await req.json();
     const data: any = {};
+    if (nisn !== undefined) data.nisn = nisn || null;
     if (name) data.name = name;
     if (classId) data.classId = parseInt(classId);
     await db.update(students).set(data).where(eq(students.id, parseInt(params.id)));

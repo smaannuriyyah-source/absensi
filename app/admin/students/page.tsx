@@ -7,10 +7,11 @@ import Select from "@/components/ui/Select";
 import Modal from "@/components/ui/Modal";
 import Alert from "@/components/ui/Alert";
 import Tabs from "@/components/ui/Tabs";
-import { Search, ArrowUpDown, Upload, Plus, Edit2, Trash2, Users, ArrowUp, ArrowDown } from "lucide-react";
+import { Search, ArrowUpDown, Upload, Plus, Edit2, Trash2, Users, ArrowUp, ArrowDown, Download } from "lucide-react";
 
 interface Student {
   id: number;
+  nisn?: string | null;
   name: string;
   classId: number;
   className?: string;
@@ -43,17 +44,19 @@ export default function StudentsPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
 
   // Add form
+  const [newNisn, setNewNisn] = useState("");
   const [newName, setNewName] = useState("");
   const [newClassId, setNewClassId] = useState("");
   const [saving, setSaving] = useState(false);
 
   // Edit form
+  const [editNisn, setEditNisn] = useState("");
   const [editName, setEditName] = useState("");
   const [editClassId, setEditClassId] = useState("");
 
   // Import
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [importData, setImportData] = useState<{ name: string; className: string }[]>([]);
+  const [importData, setImportData] = useState<{ nisn: string; name: string; className: string }[]>([]);
   const [importLoading, setImportLoading] = useState(false);
 
   useEffect(() => {
@@ -61,9 +64,7 @@ export default function StudentsPage() {
   }, []);
 
   useEffect(() => {
-    if (selectedClass) {
-      fetchStudents();
-    }
+    fetchStudents();
   }, [selectedClass]);
 
   const fetchClasses = async () => {
@@ -71,19 +72,16 @@ export default function StudentsPage() {
       const res = await fetch("/api/classes");
       const data = await res.json();
       setClasses(data);
-      if (data.length > 0) {
-        setSelectedClass(data[0].id.toString());
-      }
     } catch {
       setAlert({ type: "error", message: "Gagal memuat data kelas" });
     }
   };
 
   const fetchStudents = async () => {
-    if (!selectedClass) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/students?classId=${selectedClass}`);
+      const url = selectedClass ? `/api/students?classId=${selectedClass}` : "/api/students";
+      const res = await fetch(url);
       const data = await res.json();
       setStudents(data);
     } catch {
@@ -100,7 +98,7 @@ export default function StudentsPage() {
       const res = await fetch("/api/students", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newName, classId: parseInt(newClassId) }),
+        body: JSON.stringify({ nisn: newNisn || null, name: newName, classId: parseInt(newClassId) }),
       });
 
       if (!res.ok) {
@@ -110,6 +108,7 @@ export default function StudentsPage() {
       }
 
       setAlert({ type: "success", message: "Siswa berhasil ditambahkan!" });
+      setNewNisn("");
       setNewName("");
       setNewClassId("");
       setShowAdd(false);
@@ -129,7 +128,7 @@ export default function StudentsPage() {
       const res = await fetch(`/api/students/${showEdit.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: editName, classId: parseInt(editClassId) }),
+        body: JSON.stringify({ nisn: editNisn || null, name: editName, classId: parseInt(editClassId) }),
       });
 
       if (!res.ok) {
@@ -171,9 +170,10 @@ export default function StudentsPage() {
       const data = await file.arrayBuffer();
       const workbook = XLSX.read(data);
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = XLSX.utils.sheet_to_json<{ Nama?: string; nama?: string; Kelas?: string; kelas?: string }>(sheet);
+      const jsonData = XLSX.utils.sheet_to_json<{ NISN?: string; nisn?: string; Nama?: string; nama?: string; Kelas?: string; kelas?: string }>(sheet);
 
       const parsed = jsonData.map((row) => ({
+        nisn: row.NISN || row.nisn || "",
         name: row.Nama || row.nama || "",
         className: row.Kelas || row.kelas || "",
       })).filter((r) => r.name);
@@ -225,6 +225,18 @@ export default function StudentsPage() {
       setSortField(field);
       setSortDirection("asc");
     }
+  };
+
+  const handleDownloadTemplate = async () => {
+    const XLSX = await import("xlsx");
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet([
+      ["NISN", "Nama", "Kelas"],
+      ["0012345678", "Ahmad Fauzi", "X RPL 1"],
+      ["0012345679", "Siti Nurhaliza", "X RPL 2"],
+    ]);
+    XLSX.utils.book_append_sheet(wb, ws, "Template Import Siswa");
+    XLSX.writeFile(wb, "template_import_siswa.xlsx");
   };
 
   const filteredAndSortedStudents = useMemo(() => {
@@ -337,6 +349,7 @@ export default function StudentsPage() {
                 <thead>
                   <tr className="glass-table-header border-b border-white/20 dark:border-white/10">
                     <th className="px-4 py-3.5 text-left text-sm font-semibold text-gray-700 dark:text-gray-300 w-12">No</th>
+                    <th className="px-4 py-3.5 text-left text-sm font-semibold text-gray-700 dark:text-gray-300">NISN</th>
                     <th className="px-4 py-3.5 text-left text-sm font-semibold text-gray-700 dark:text-gray-300">
                       <button
                         onClick={() => handleSort("name")}
@@ -346,32 +359,44 @@ export default function StudentsPage() {
                         <SortIcon field="name" />
                       </button>
                     </th>
+                    <th className="px-4 py-3.5 text-left text-sm font-semibold text-gray-700 dark:text-gray-300">
+                      <button
+                        onClick={() => handleSort("class")}
+                        className="flex items-center gap-1.5 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+                      >
+                        Kelas
+                        <SortIcon field="class" />
+                      </button>
+                    </th>
                     <th className="px-4 py-3.5 text-right text-sm font-semibold text-gray-700 dark:text-gray-300">Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={3} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                      <td colSpan={5} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
                         Loading...
                       </td>
                     </tr>
                   ) : filteredAndSortedStudents.length === 0 ? (
                     <tr>
-                      <td colSpan={3} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
-                        {search ? "Tidak ada siswa ditemukan" : "Belum ada siswa di kelas ini"}
+                      <td colSpan={5} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                        {search ? "Tidak ada siswa ditemukan" : "Belum ada siswa"}
                       </td>
                     </tr>
                   ) : (
                     filteredAndSortedStudents.map((student, index) => (
                       <tr key={student.id} className="glass-table-row border-b border-white/10 dark:border-white/5 last:border-b-0 hover:bg-white/10 dark:hover:bg-white/[0.03] transition-colors">
                         <td className="px-4 py-3.5 text-sm text-gray-600 dark:text-gray-400">{index + 1}</td>
+                        <td className="px-4 py-3.5 text-sm text-gray-600 dark:text-gray-400">{student.nisn || "-"}</td>
                         <td className="px-4 py-3.5 text-sm text-gray-600 dark:text-gray-400 font-medium">{student.name}</td>
+                        <td className="px-4 py-3.5 text-sm text-gray-600 dark:text-gray-400">{student.className}</td>
                         <td className="px-4 py-3.5 text-right">
                           <div className="flex gap-2 justify-end">
                             <button
                               onClick={() => {
                                 setShowEdit(student);
+                                setEditNisn(student.nisn || "");
                                 setEditName(student.name);
                                 setEditClassId(student.classId.toString());
                               }}
@@ -411,9 +436,16 @@ export default function StudentsPage() {
             Import Siswa dari Excel
           </h3>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            Format Excel: kolom <strong>Nama</strong> dan <strong>Kelas</strong>.
+            Format Excel: kolom <strong>NISN</strong>, <strong>Nama</strong>, dan <strong>Kelas</strong>.
             Kelas akan dibuat otomatis jika belum ada.
           </p>
+
+          <div className="mb-4">
+            <Button variant="secondary" onClick={handleDownloadTemplate} className="mb-3">
+              <Download size={16} className="mr-1.5" />
+              Download Template Excel
+            </Button>
+          </div>
           
           <div className="mb-4">
             <input
@@ -440,6 +472,7 @@ export default function StudentsPage() {
                   <thead className="glass-table-header sticky top-0">
                     <tr>
                       <th className="px-3 py-2 text-left text-gray-700 dark:text-gray-300">No</th>
+                      <th className="px-3 py-2 text-left text-gray-700 dark:text-gray-300">NISN</th>
                       <th className="px-3 py-2 text-left text-gray-700 dark:text-gray-300">Nama</th>
                       <th className="px-3 py-2 text-left text-gray-700 dark:text-gray-300">Kelas</th>
                     </tr>
@@ -448,13 +481,14 @@ export default function StudentsPage() {
                     {importData.slice(0, 20).map((item, i) => (
                       <tr key={i} className="glass-table-row border-b border-white/10 dark:border-white/5 last:border-b-0">
                         <td className="px-3 py-1 text-gray-900 dark:text-gray-100">{i + 1}</td>
+                        <td className="px-3 py-1 text-gray-900 dark:text-gray-100">{item.nisn || "-"}</td>
                         <td className="px-3 py-1 text-gray-900 dark:text-gray-100">{item.name}</td>
                         <td className="px-3 py-1 text-gray-900 dark:text-gray-100">{item.className}</td>
                       </tr>
                     ))}
                     {importData.length > 20 && (
                       <tr>
-                        <td colSpan={3} className="px-3 py-1 text-gray-500 dark:text-gray-400 text-center">
+                        <td colSpan={4} className="px-3 py-1 text-gray-500 dark:text-gray-400 text-center">
                           ... dan {importData.length - 20} lainnya
                         </td>
                       </tr>
@@ -488,6 +522,13 @@ export default function StudentsPage() {
       <Modal isOpen={showAdd} onClose={() => setShowAdd(false)} title="Tambah Siswa">
         <form onSubmit={handleAdd}>
           <Input
+            label="NISN"
+            type="text"
+            value={newNisn}
+            onChange={(e) => setNewNisn(e.target.value)}
+            placeholder="NISN (opsional)"
+          />
+          <Input
             label="Nama Siswa"
             type="text"
             value={newName}
@@ -517,6 +558,13 @@ export default function StudentsPage() {
       {/* Edit Modal */}
       <Modal isOpen={!!showEdit} onClose={() => setShowEdit(null)} title="Edit Siswa">
         <form onSubmit={handleEdit}>
+          <Input
+            label="NISN"
+            type="text"
+            value={editNisn}
+            onChange={(e) => setEditNisn(e.target.value)}
+            placeholder="NISN (opsional)"
+          />
           <Input
             label="Nama Siswa"
             type="text"

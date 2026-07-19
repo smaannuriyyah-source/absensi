@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Button from "@/components/ui/Button";
 import { getDailyQuote, getGreeting } from "@/lib/quotes";
-import { ClipboardList, BookOpen, BarChart3, AlertTriangle, Clock } from "lucide-react";
+import { ClipboardList, BookOpen, BarChart3, AlertTriangle, Clock, FlaskConical } from "lucide-react";
 
 export default function TeacherDashboard() {
   const [profile, setProfile] = useState<{ name: string; profileComplete: boolean } | null>(null);
@@ -97,7 +97,7 @@ export default function TeacherDashboard() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Link href="/teacher/attendance">
           <div className="glass-card-hover p-6 cursor-pointer group">
             <div className="flex items-center gap-4">
@@ -118,8 +118,21 @@ export default function TeacherDashboard() {
                 <BookOpen size={24} />
               </div>
               <div>
-                <h3 className="font-semibold text-gray-900 dark:text-gray-100">Penilaian</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Input & edit nilai siswa</p>
+                <h3 className="font-semibold text-gray-900 dark:text-gray-100">Penilaian Pengetahuan</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Input nilai pengetahuan</p>
+              </div>
+            </div>
+          </div>
+        </Link>
+        <Link href="/teacher/grades/practice">
+          <div className="glass-card-hover p-6 cursor-pointer group">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-green-400/15 dark:bg-green-400/10 text-green-600 dark:text-green-400 border border-green-400/20 dark:border-green-400/10 rounded-xl group-hover:bg-green-400/25 dark:group-hover:bg-green-400/15 transition-colors">
+                <FlaskConical size={24} />
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900 dark:text-gray-100">Penilaian Praktek</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Input nilai praktek</p>
               </div>
             </div>
           </div>

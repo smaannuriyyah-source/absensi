@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
     let skipped = 0;
 
     for (const item of importData) {
-      const { name, className } = item;
+      const { nisn, name, className } = item;
       if (!name) continue;
 
       let classRecord = await db.select().from(classes).where(eq(classes.name, className)).limit(1).then(r => r[0]);
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
       ).limit(1);
       if (existing.length > 0) { skipped++; continue; }
 
-      await db.insert(students).values({ name, classId: classRecord.id });
+      await db.insert(students).values({ nisn: nisn || null, name, classId: classRecord.id });
       imported++;
     }
 

@@ -47,6 +47,7 @@ export const classes = sqliteTable("classes", {
 // ── Student ───────────────────────────────────────────
 export const students = sqliteTable("students", {
   id: int().primaryKey({ autoIncrement: true }),
+  nisn: text("nisn"),
   name: text().notNull(),
   classId: int("class_id")
     .notNull()

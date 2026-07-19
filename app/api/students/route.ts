@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
     const whereClause = classId ? eq(students.classId, parseInt(classId)) : undefined;
 
     const result = await db
-      .select({ id: students.id, name: students.name, classId: students.classId, className: classes.name })
+      .select({ id: students.id, nisn: students.nisn, name: students.name, classId: students.classId, className: classes.name })
       .from(students)
       .innerJoin(classes, eq(students.classId, classes.id))
       .where(whereClause);
@@ -30,9 +30,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     await requireAdmin();
-    const { name, classId } = await req.json();
+    const { nisn, name, classId } = await req.json();
     if (!name || !classId) return NextResponse.json({ error: "Nama dan kelas wajib diisi" }, { status: 400 });
-    const result = await db.insert(students).values({ name, classId: parseInt(classId) }).returning();
+    const result = await db.insert(students).values({ nisn: nisn || null, name, classId: parseInt(classId) }).returning();
     return NextResponse.json(result[0]);
   } catch (error: any) {
     if (error.message === "Unauthorized") return NextResponse.json({ error: error.message }, { status: 401 });
