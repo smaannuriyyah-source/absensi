@@ -1,36 +1,41 @@
 {
-  "name": "react-native",
+  "name": "absensi-app",
   "version": "1.0.0",
-  "description": "React Native for Web starter template",
-  "keywords": [],
-  "main": "src/index.js",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "lint": "next lint",
+    "db:push": "prisma db push",
+    "db:seed": "tsx lib/seed.ts",
+    "db:studio": "prisma studio",
+    "postinstall": "prisma generate"
+  },
   "dependencies": {
-    "react": "18.2.*",
-    "react-dom": "18.2.*",
-    "react-native-web": "0.19.*",
-    "react-scripts": "3.3.0",
-    "@react-navigation/native": "7.1.16",
-    "@react-navigation/stack": "7.4.8"
+    "@libsql/client": "^0.14.0",
+    "@prisma/adapter-libsql": "^7.8.0",
+    "@prisma/client": "^6.19.3",
+    "bcryptjs": "^2.4.3",
+    "iron-session": "^8.0.2",
+    "lucide-react": "^1.25.0",
+    "next": "^14.2.0",
+    "prisma": "^6.19.3",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
-    "@babel/core": "^7.22.15",
-    "@babel/preset-env": "^7.22.15",
-    "@babel/preset-react": "^7.22.15",
-    "babel-plugin-transform-react-jsx-source": "^7.22.15",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^20.14.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "autoprefixer": "^10.4.20",
     "eslint": "^8.57.0",
-    "eslint-config-airbnb": "^19.8.0",
-    "eslint-plugin-import": "^2.27.5",
-    "eslint-plugin-jest": "^27.9.2",
-    "eslint-plugin-node": "^11.22.0",
-    "eslint-plugin-react": "^7.33.2",
-    "eslint-plugin-react-hooks": "^4.6.0",
-    "jest-expo": "^5.4.0",
-    "prettier": "^2.9.3"
-  },
-  "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test --env=jsdom",
-    "eject": "react-scripts eject"
+    "eslint-config-next": "^14.2.0",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.0"
   }
 }

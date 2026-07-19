@@ -1,0 +1,174 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("TURSO_DATABASE_URL")
+}
+
+model Admin {
+  id           Int    @id @default(autoincrement())
+  username     String @unique
+  passwordHash String @map("password_hash")
+
+  @@map("admins")
+}
+
+model Teacher {
+  id             Int     @id @default(autoincrement())
+  username       String  @unique
+  passwordHash   String  @map("password_hash")
+  accessCode     String  @unique @map("access_code")
+  name           String  @default("")
+  profileComplete Boolean @default(false) @map("profile_complete")
+
+  subjects        TeacherSubject[]
+  journals        TeachingJournal[]
+  attendance      Attendance[]
+  knowledgeGrades KnowledgeGrade[]
+  practiceGrades  PracticeGrade[]
+
+  @@map("teachers")
+}
+
+model Subject {
+  id   Int    @id @default(autoincrement())
+  name String
+
+  teachers           TeacherSubject[]
+  journals           TeachingJournal[]
+  attendance         Attendance[]
+  knowledgeGrades    KnowledgeGrade[]
+  practiceGrades     PracticeGrade[]
+
+  @@map("subjects")
+}
+
+model TeacherSubject {
+  teacherId Int     @map("teacher_id")
+  subjectId Int     @map("subject_id")
+  teacher   Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  subject   Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@id([teacherId, subjectId])
+  @@map("teacher_subjects")
+}
+
+model Class {
+  id   Int    @id @default(autoincrement())
+  name String
+
+  students           Student[]
+  journals           TeachingJournal[]
+  attendance         Attendance[]
+  knowledgeGrades    KnowledgeGrade[]
+  practiceGrades     PracticeGrade[]
+
+  @@map("classes")
+}
+
+model Student {
+  id      Int    @id @default(autoincrement())
+  name    String
+  classId Int    @map("class_id")
+  class   Class  @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  attendance      Attendance[]
+  knowledgeGrades KnowledgeGrade[]
+  practiceGrades  PracticeGrade[]
+
+  @@map("students")
+}
+
+model AcademicYear {
+  id       Int     @id @default(autoincrement())
+  year     String
+  isActive Boolean @default(false) @map("is_active")
+
+  journals        TeachingJournal[]
+  knowledgeGrades KnowledgeGrade[]
+  practiceGrades  PracticeGrade[]
+
+  @@map("academic_years")
+}
+
+model TeachingJournal {
+  id             Int         @id @default(autoincrement())
+  teacherId      Int         @map("teacher_id")
+  classId        Int         @map("class_id")
+  date           String
+  hour           Int
+  subjectId      Int         @map("subject_id")
+  material       String
+  academicYearId Int         @map("academic_year_id")
+  createdAt      String      @default("") @map("created_at")
+
+  teacher      Teacher      @relation(fields: [teacherId], references: [id])
+  class        Class        @relation(fields: [classId], references: [id])
+  subject      Subject      @relation(fields: [subjectId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+
+  @@map("teaching_journals")
+}
+
+model Attendance {
+  id        Int    @id @default(autoincrement())
+  studentId Int    @map("student_id")
+  teacherId Int    @map("teacher_id")
+  subjectId Int    @map("subject_id")
+  classId   Int    @map("class_id")
+  date      String
+  status    String @default("hadir")
+  evidence  String?
+
+  student Student @relation(fields: [studentId], references: [id])
+  teacher Teacher @relation(fields: [teacherId], references: [id])
+  subject Subject @relation(fields: [subjectId], references: [id])
+  class   Class   @relation(fields: [classId], references: [id])
+
+  @@map("attendance")
+}
+
+model KnowledgeGrade {
+  id             Int         @id @default(autoincrement())
+  studentId      Int         @map("student_id")
+  teacherId      Int         @map("teacher_id")
+  subjectId      Int         @map("subject_id")
+  classId        Int         @map("class_id")
+  uh1            Int?
+  uh2            Int?
+  uh3            Int?
+  uts            Int?
+  uas            Int?
+  semester       Int         @default(1)
+  academicYearId Int         @map("academic_year_id")
+
+  student      Student      @relation(fields: [studentId], references: [id])
+  teacher      Teacher      @relation(fields: [teacherId], references: [id])
+  subject      Subject      @relation(fields: [subjectId], references: [id])
+  class        Class        @relation(fields: [classId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+
+  @@map("knowledge_grades")
+}
+
+model PracticeGrade {
+  id             Int         @id @default(autoincrement())
+  studentId      Int         @map("student_id")
+  teacherId      Int         @map("teacher_id")
+  subjectId      Int         @map("subject_id")
+  classId        Int         @map("class_id")
+  practice1      Int?
+  practice2      Int?
+  semester       Int         @default(1)
+  academicYearId Int         @map("academic_year_id")
+
+  student      Student      @relation(fields: [studentId], references: [id])
+  teacher      Teacher      @relation(fields: [teacherId], references: [id])
+  subject      Subject      @relation(fields: [subjectId], references: [id])
+  class        Class        @relation(fields: [classId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+
+  @@map("practice_grades")
+}
