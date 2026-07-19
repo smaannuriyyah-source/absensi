@@ -1,7 +1,10 @@
+export const dynamic = "force-dynamic";
+
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createSession } from "@/lib/auth";
 import bcrypt from "bcryptjs";
+import { autoSeed } from "@/lib/auto-seed";
 
 export async function POST(req: NextRequest) {
   try {
@@ -9,7 +12,15 @@ export async function POST(req: NextRequest) {
     const { type, username, password, accessCode } = body;
 
     if (type === "password") {
-      const admin = await prisma.admin.findFirst({ where: { username } });
+      // Try admin login
+      let admin = await prisma.admin.findFirst({ where: { username } });
+
+      // If no admin exists, run auto-seed first
+      if (!admin) {
+        await autoSeed();
+        admin = await prisma.admin.findFirst({ where: { username } });
+      }
+
       if (admin && (await bcrypt.compare(password, admin.passwordHash))) {
         await createSession({ id: admin.id, role: "admin", username: admin.username });
         return NextResponse.json({ success: true, role: "admin" });

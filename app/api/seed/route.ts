@@ -1,13 +1,10 @@
+import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { prisma } from "./prisma";
+import { prisma } from "@/lib/prisma";
 
-let isSeeding = false;
-let seeded = false;
+export const dynamic = "force-dynamic";
 
-export async function autoSeed() {
-  if (seeded || isSeeding) return;
-  isSeeding = true;
-
+export async function GET() {
   try {
     const adminUsername = process.env.ADMIN_USERNAME || "admin";
     const existingAdmin = await prisma.admin.findFirst({
@@ -15,11 +12,10 @@ export async function autoSeed() {
     });
 
     if (existingAdmin) {
-      seeded = true;
-      return;
+      return NextResponse.json({ message: "Database already seeded", seeded: false });
     }
 
-    console.log("🌱 First run detected, seeding database...");
+    console.log("🌱 Seeding database...");
 
     const adminPassword = process.env.ADMIN_PASSWORD || "admin123";
     const adminHash = await bcrypt.hash(adminPassword, 10);
@@ -49,10 +45,10 @@ export async function autoSeed() {
       if (!existing) await prisma.class.create({ data: { name } });
     }
 
-    console.log("✅ Auto-seed completed");
-    seeded = true;
+    console.log("✅ Seed completed");
+    return NextResponse.json({ message: "Database seeded successfully", seeded: true });
   } catch (error) {
-    console.error("⚠️ Auto-seed failed (non-fatal):", error);
-    isSeeding = false;
+    console.error("❌ Seed error:", error);
+    return NextResponse.json({ error: "Seed failed" }, { status: 500 });
   }
 }
