@@ -1,26 +1,29 @@
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { db } from "@/lib/db";
+import { teachers, classes, students, academicYears, teachingJournals } from "@/lib/schema";
 import { requireAdmin } from "@/lib/dal";
+import { eq, and, count } from "drizzle-orm";
 
 export async function GET() {
   try {
     await requireAdmin();
     const today = new Date().toISOString().split("T")[0];
 
-    const [totalTeachers, totalClasses, totalStudents, activeYear] = await Promise.all([
-      prisma.teacher.count(),
-      prisma.class.count(),
-      prisma.student.count(),
-      prisma.academicYear.findFirst({ where: { isActive: true } }),
+    const [totalTeachers, totalClasses, totalStudents] = await Promise.all([
+      db.select({ value: count() }).from(teachers).then(r => r[0].value),
+      db.select({ value: count() }).from(classes).then(r => r[0].value),
+      db.select({ value: count() }).from(students).then(r => r[0].value),
     ]);
+
+    const activeYear = await db.select().from(academicYears).where(eq(academicYears.isActive, true)).limit(1).then(r => r[0]);
 
     let todayJournals = 0;
     if (activeYear) {
-      todayJournals = await prisma.teachingJournal.count({
-        where: { date: today, academicYearId: activeYear.id },
-      });
+      todayJournals = await db.select({ value: count() }).from(teachingJournals).where(
+        and(eq(teachingJournals.date, today), eq(teachingJournals.academicYearId, activeYear.id))
+      ).then(r => r[0].value);
     }
 
     return NextResponse.json({ totalTeachers, totalClasses, totalStudents, todayJournals });

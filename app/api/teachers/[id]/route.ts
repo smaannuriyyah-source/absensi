@@ -1,15 +1,18 @@
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { db } from "@/lib/db";
+import { teachers, teacherSubjects } from "@/lib/schema";
 import { requireAdmin } from "@/lib/dal";
+import { eq } from "drizzle-orm";
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     await requireAdmin();
-    const teacher = await prisma.teacher.findUnique({ where: { id: parseInt(params.id) } });
+    const teacher = await db.select().from(teachers).where(eq(teachers.id, parseInt(params.id))).limit(1).then(r => r[0]);
     if (!teacher) return NextResponse.json({ error: "Guru tidak ditemukan" }, { status: 404 });
-    return NextResponse.json({ ...teacher, passwordHash: undefined });
+    const { passwordHash, ...teacherData } = teacher;
+    return NextResponse.json(teacherData);
   } catch (error: any) {
     if (error.message === "Unauthorized") return NextResponse.json({ error: error.message }, { status: 401 });
     if (error.message === "Forbidden") return NextResponse.json({ error: error.message }, { status: 403 });
@@ -26,15 +29,15 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     const updateData: any = {};
     if (name !== undefined) updateData.name = name;
     if (Object.keys(updateData).length > 0) {
-      await prisma.teacher.update({ where: { id }, data: updateData });
+      await db.update(teachers).set(updateData).where(eq(teachers.id, id));
     }
 
     if (subjectIds !== undefined) {
-      await prisma.teacherSubject.deleteMany({ where: { teacherId: id } });
+      await db.delete(teacherSubjects).where(eq(teacherSubjects.teacherId, id));
       if (subjectIds.length > 0) {
-        await prisma.teacherSubject.createMany({
-          data: subjectIds.map((subjectId: number) => ({ teacherId: id, subjectId })),
-        });
+        await db.insert(teacherSubjects).values(
+          subjectIds.map((subjectId: number) => ({ teacherId: id, subjectId }))
+        );
       }
     }
 
@@ -49,7 +52,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     await requireAdmin();
-    await prisma.teacher.delete({ where: { id: parseInt(params.id) } });
+    await db.delete(teachers).where(eq(teachers.id, parseInt(params.id)));
     return NextResponse.json({ success: true });
   } catch (error: any) {
     if (error.message === "Unauthorized") return NextResponse.json({ error: error.message }, { status: 401 });

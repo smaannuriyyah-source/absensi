@@ -1,13 +1,14 @@
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { db } from "@/lib/db";
+import { subjects } from "@/lib/schema";
 import { requireAdmin, requireAuth } from "@/lib/dal";
 
 export async function GET() {
   try {
     await requireAuth();
-    const allSubjects = await prisma.subject.findMany();
+    const allSubjects = await db.select().from(subjects);
     return NextResponse.json(allSubjects);
   } catch (error: any) {
     if (error.message === "Unauthorized") return NextResponse.json({ error: error.message }, { status: 401 });
@@ -21,8 +22,8 @@ export async function POST(req: NextRequest) {
     await requireAdmin();
     const { name } = await req.json();
     if (!name) return NextResponse.json({ error: "Nama mapel wajib diisi" }, { status: 400 });
-    const result = await prisma.subject.create({ data: { name } });
-    return NextResponse.json(result);
+    const result = await db.insert(subjects).values({ name }).returning();
+    return NextResponse.json(result[0]);
   } catch (error: any) {
     if (error.message === "Unauthorized") return NextResponse.json({ error: error.message }, { status: 401 });
     if (error.message === "Forbidden") return NextResponse.json({ error: error.message }, { status: 403 });

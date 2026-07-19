@@ -1,8 +1,10 @@
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { db } from "@/lib/db";
+import { students, academicYears, knowledgeGrades } from "@/lib/schema";
 import { requireAuth } from "@/lib/dal";
+import { eq, and } from "drizzle-orm";
 
 export async function GET(req: NextRequest) {
   try {
@@ -12,17 +14,19 @@ export async function GET(req: NextRequest) {
     const semester = req.nextUrl.searchParams.get("semester") || "1";
     if (!classId || !subjectId) return NextResponse.json({ error: "Kelas dan mapel wajib diisi" }, { status: 400 });
 
-    const classStudents = await prisma.student.findMany({ where: { classId: parseInt(classId) } });
-    const activeYear = await prisma.academicYear.findFirst({ where: { isActive: true } });
+    const classStudents = await db.select().from(students).where(eq(students.classId, parseInt(classId)));
+    const activeYear = await db.select().from(academicYears).where(eq(academicYears.isActive, true)).limit(1).then(r => r[0]);
     if (!activeYear) return NextResponse.json({ error: "Tidak ada tahun ajaran aktif. Hubungi admin." }, { status: 400 });
 
-    const where: any = {
-      classId: parseInt(classId), subjectId: parseInt(subjectId),
-      academicYearId: activeYear.id, semester: parseInt(semester),
-    };
-    if (session.role === "teacher") where.teacherId = session.id;
+    const conditions = [
+      eq(knowledgeGrades.classId, parseInt(classId)),
+      eq(knowledgeGrades.subjectId, parseInt(subjectId)),
+      eq(knowledgeGrades.academicYearId, activeYear.id),
+      eq(knowledgeGrades.semester, parseInt(semester)),
+    ];
+    if (session.role === "teacher") conditions.push(eq(knowledgeGrades.teacherId, session.id));
 
-    const grades = await prisma.knowledgeGrade.findMany({ where });
+    const grades = await db.select().from(knowledgeGrades).where(and(...conditions));
     return NextResponse.json({ students: classStudents, grades });
   } catch (error: any) {
     if (error.message === "Unauthorized") return NextResponse.json({ error: error.message }, { status: 401 });
@@ -37,19 +41,27 @@ export async function POST(req: NextRequest) {
     const { studentId, classId, subjectId, uh1, uh2, uh3, uts, uas, semester } = await req.json();
     if (!studentId || !classId || !subjectId) return NextResponse.json({ error: "Data tidak lengkap" }, { status: 400 });
 
-    const activeYear = await prisma.academicYear.findFirst({ where: { isActive: true } });
+    const activeYear = await db.select().from(academicYears).where(eq(academicYears.isActive, true)).limit(1).then(r => r[0]);
     if (!activeYear) return NextResponse.json({ error: "Tidak ada tahun ajaran aktif. Hubungi admin." }, { status: 400 });
     const sem = semester || 1;
 
-    const existing = await prisma.knowledgeGrade.findFirst({
-      where: { studentId, teacherId: session.id, subjectId, classId, academicYearId: activeYear.id, semester: sem },
-    });
+    const existing = await db.select().from(knowledgeGrades).where(
+      and(
+        eq(knowledgeGrades.studentId, studentId),
+        eq(knowledgeGrades.teacherId, session.id),
+        eq(knowledgeGrades.subjectId, subjectId),
+        eq(knowledgeGrades.classId, classId),
+        eq(knowledgeGrades.academicYearId, activeYear.id),
+        eq(knowledgeGrades.semester, sem)
+      )
+    ).limit(1).then(r => r[0]);
 
     if (existing) {
-      await prisma.knowledgeGrade.update({ where: { id: existing.id }, data: { uh1, uh2, uh3, uts, uas } });
+      await db.update(knowledgeGrades).set({ uh1, uh2, uh3, uts, uas }).where(eq(knowledgeGrades.id, existing.id));
     } else {
-      await prisma.knowledgeGrade.create({
-        data: { studentId, teacherId: session.id, subjectId, classId, uh1, uh2, uh3, uts, uas, semester: sem, academicYearId: activeYear.id },
+      await db.insert(knowledgeGrades).values({
+        studentId, teacherId: session.id, subjectId, classId,
+        uh1, uh2, uh3, uts, uas, semester: sem, academicYearId: activeYear.id,
       });
     }
     return NextResponse.json({ success: true });

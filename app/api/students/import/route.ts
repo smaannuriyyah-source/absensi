@@ -1,8 +1,10 @@
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { db } from "@/lib/db";
+import { students, classes } from "@/lib/schema";
 import { requireAdmin } from "@/lib/dal";
+import { eq, and } from "drizzle-orm";
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,17 +21,18 @@ export async function POST(req: NextRequest) {
       const { name, className } = item;
       if (!name) continue;
 
-      let classRecord = await prisma.class.findFirst({ where: { name: className } });
+      let classRecord = await db.select().from(classes).where(eq(classes.name, className)).limit(1).then(r => r[0]);
       if (!classRecord) {
-        classRecord = await prisma.class.create({ data: { name: className } });
+        const newClass = await db.insert(classes).values({ name: className }).returning();
+        classRecord = newClass[0];
       }
 
-      const existing = await prisma.student.findFirst({
-        where: { name, classId: classRecord.id },
-      });
-      if (existing) { skipped++; continue; }
+      const existing = await db.select().from(students).where(
+        and(eq(students.name, name), eq(students.classId, classRecord.id))
+      ).limit(1);
+      if (existing.length > 0) { skipped++; continue; }
 
-      await prisma.student.create({ data: { name, classId: classRecord.id } });
+      await db.insert(students).values({ name, classId: classRecord.id });
       imported++;
     }
 

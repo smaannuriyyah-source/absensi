@@ -1,6 +1,8 @@
 import { getIronSession, IronSession } from "iron-session";
 import { cookies } from "next/headers";
-import { prisma } from "./prisma";
+import { db } from "./db";
+import { teachers } from "./schema";
+import { eq } from "drizzle-orm";
 
 export type SessionData = {
   id: number;
@@ -40,10 +42,8 @@ export async function generateUniqueAccessCode(): Promise<string> {
   let exists: boolean;
   do {
     code = Math.floor(100000 + Math.random() * 900000).toString();
-    const existing = await prisma.teacher.findFirst({
-      where: { accessCode: code },
-    });
-    exists = !!existing;
+    const existing = await db.select().from(teachers).where(eq(teachers.accessCode, code)).limit(1);
+    exists = existing.length > 0;
   } while (exists);
   return code;
 }

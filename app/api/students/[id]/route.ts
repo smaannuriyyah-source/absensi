@@ -1,8 +1,10 @@
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { db } from "@/lib/db";
+import { students } from "@/lib/schema";
 import { requireAdmin } from "@/lib/dal";
+import { eq } from "drizzle-orm";
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -11,7 +13,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     const data: any = {};
     if (name) data.name = name;
     if (classId) data.classId = parseInt(classId);
-    await prisma.student.update({ where: { id: parseInt(params.id) }, data });
+    await db.update(students).set(data).where(eq(students.id, parseInt(params.id)));
     return NextResponse.json({ success: true });
   } catch (error: any) {
     if (error.message === "Unauthorized") return NextResponse.json({ error: error.message }, { status: 401 });
@@ -23,7 +25,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     await requireAdmin();
-    await prisma.student.delete({ where: { id: parseInt(params.id) } });
+    await db.delete(students).where(eq(students.id, parseInt(params.id)));
     return NextResponse.json({ success: true });
   } catch (error: any) {
     if (error.message === "Unauthorized") return NextResponse.json({ error: error.message }, { status: 401 });

@@ -1,8 +1,10 @@
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { db } from "@/lib/db";
+import { students, academicYears, practiceGrades } from "@/lib/schema";
 import { requireAuth } from "@/lib/dal";
+import { eq, and } from "drizzle-orm";
 
 export async function GET(req: NextRequest) {
   try {
@@ -12,17 +14,19 @@ export async function GET(req: NextRequest) {
     const semester = req.nextUrl.searchParams.get("semester") || "1";
     if (!classId || !subjectId) return NextResponse.json({ error: "Kelas dan mapel wajib diisi" }, { status: 400 });
 
-    const classStudents = await prisma.student.findMany({ where: { classId: parseInt(classId) } });
-    const activeYear = await prisma.academicYear.findFirst({ where: { isActive: true } });
+    const classStudents = await db.select().from(students).where(eq(students.classId, parseInt(classId)));
+    const activeYear = await db.select().from(academicYears).where(eq(academicYears.isActive, true)).limit(1).then(r => r[0]);
     if (!activeYear) return NextResponse.json({ error: "Tidak ada tahun ajaran aktif. Hubungi admin." }, { status: 400 });
 
-    const where: any = {
-      classId: parseInt(classId), subjectId: parseInt(subjectId),
-      academicYearId: activeYear.id, semester: parseInt(semester),
-    };
-    if (session.role === "teacher") where.teacherId = session.id;
+    const conditions = [
+      eq(practiceGrades.classId, parseInt(classId)),
+      eq(practiceGrades.subjectId, parseInt(subjectId)),
+      eq(practiceGrades.academicYearId, activeYear.id),
+      eq(practiceGrades.semester, parseInt(semester)),
+    ];
+    if (session.role === "teacher") conditions.push(eq(practiceGrades.teacherId, session.id));
 
-    const grades = await prisma.practiceGrade.findMany({ where });
+    const grades = await db.select().from(practiceGrades).where(and(...conditions));
     return NextResponse.json({ students: classStudents, grades });
   } catch (error: any) {
     if (error.message === "Unauthorized") return NextResponse.json({ error: error.message }, { status: 401 });
@@ -37,19 +41,27 @@ export async function POST(req: NextRequest) {
     const { studentId, classId, subjectId, practice1, practice2, semester } = await req.json();
     if (!studentId || !classId || !subjectId) return NextResponse.json({ error: "Data tidak lengkap" }, { status: 400 });
 
-    const activeYear = await prisma.academicYear.findFirst({ where: { isActive: true } });
+    const activeYear = await db.select().from(academicYears).where(eq(academicYears.isActive, true)).limit(1).then(r => r[0]);
     if (!activeYear) return NextResponse.json({ error: "Tidak ada tahun ajaran aktif. Hubungi admin." }, { status: 400 });
     const sem = semester || 1;
 
-    const existing = await prisma.practiceGrade.findFirst({
-      where: { studentId, teacherId: session.id, subjectId, classId, academicYearId: activeYear.id, semester: sem },
-    });
+    const existing = await db.select().from(practiceGrades).where(
+      and(
+        eq(practiceGrades.studentId, studentId),
+        eq(practiceGrades.teacherId, session.id),
+        eq(practiceGrades.subjectId, subjectId),
+        eq(practiceGrades.classId, classId),
+        eq(practiceGrades.academicYearId, activeYear.id),
+        eq(practiceGrades.semester, sem)
+      )
+    ).limit(1).then(r => r[0]);
 
     if (existing) {
-      await prisma.practiceGrade.update({ where: { id: existing.id }, data: { practice1, practice2 } });
+      await db.update(practiceGrades).set({ practice1, practice2 }).where(eq(practiceGrades.id, existing.id));
     } else {
-      await prisma.practiceGrade.create({
-        data: { studentId, teacherId: session.id, subjectId, classId, practice1, practice2, semester: sem, academicYearId: activeYear.id },
+      await db.insert(practiceGrades).values({
+        studentId, teacherId: session.id, subjectId, classId,
+        practice1, practice2, semester: sem, academicYearId: activeYear.id,
       });
     }
     return NextResponse.json({ success: true });

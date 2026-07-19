@@ -1,8 +1,10 @@
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { db } from "@/lib/db";
+import { attendance, students, classes, subjects } from "@/lib/schema";
 import { requireAuth } from "@/lib/dal";
+import { eq, and, SQL } from "drizzle-orm";
 
 export async function GET(req: NextRequest) {
   try {
@@ -11,25 +13,31 @@ export async function GET(req: NextRequest) {
     const subjectId = req.nextUrl.searchParams.get("subjectId");
     const date = req.nextUrl.searchParams.get("date");
 
-    const where: any = {};
-    if (classId) where.classId = parseInt(classId);
-    if (subjectId) where.subjectId = parseInt(subjectId);
-    if (date) where.date = date;
-    if (session.role === "teacher") where.teacherId = session.id;
+    const conditions: SQL[] = [];
+    if (classId) conditions.push(eq(attendance.classId, parseInt(classId)));
+    if (subjectId) conditions.push(eq(attendance.subjectId, parseInt(subjectId)));
+    if (date) conditions.push(eq(attendance.date, date));
+    if (session.role === "teacher") conditions.push(eq(attendance.teacherId, session.id));
 
-    const records = await prisma.attendance.findMany({
-      where,
-      include: {
-        student: { select: { name: true } },
-        class: { select: { name: true } },
-        subject: { select: { name: true } },
-      },
-    });
-    const result = records.map((r) => ({
-      id: r.id, studentId: r.studentId, studentName: r.student.name,
-      className: r.class.name, subjectName: r.subject.name,
-      date: r.date, status: r.status, evidence: r.evidence,
-    }));
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const result = await db
+      .select({
+        id: attendance.id,
+        studentId: attendance.studentId,
+        studentName: students.name,
+        className: classes.name,
+        subjectName: subjects.name,
+        date: attendance.date,
+        status: attendance.status,
+        evidence: attendance.evidence,
+      })
+      .from(attendance)
+      .innerJoin(students, eq(attendance.studentId, students.id))
+      .innerJoin(classes, eq(attendance.classId, classes.id))
+      .innerJoin(subjects, eq(attendance.subjectId, subjects.id))
+      .where(whereClause);
+
     return NextResponse.json(result);
   } catch (error: any) {
     if (error.message === "Unauthorized") return NextResponse.json({ error: error.message }, { status: 401 });
@@ -54,17 +62,29 @@ export async function POST(req: NextRequest) {
 
     if (records.length > 0) {
       const first = records[0];
-      await prisma.attendance.deleteMany({
-        where: { classId: first.classId, subjectId: first.subjectId, date: first.date, teacherId: session.id },
-      });
+      await db
+        .delete(attendance)
+        .where(
+          and(
+            eq(attendance.classId, first.classId),
+            eq(attendance.subjectId, first.subjectId),
+            eq(attendance.date, first.date),
+            eq(attendance.teacherId, session.id)
+          )
+        );
     }
 
-    await prisma.attendance.createMany({
-      data: records.map((r: any) => ({
-        studentId: r.studentId, teacherId: session.id, subjectId: r.subjectId,
-        classId: r.classId, date: r.date, status: r.status, evidence: r.evidence || null,
-      })),
-    });
+    await db.insert(attendance).values(
+      records.map((r: any) => ({
+        studentId: r.studentId,
+        teacherId: session.id,
+        subjectId: r.subjectId,
+        classId: r.classId,
+        date: r.date,
+        status: r.status,
+        evidence: r.evidence || null,
+      }))
+    );
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
